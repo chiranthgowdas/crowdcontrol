@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crowd Density Tracker</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="https://cdn.socket.io/4.0.1/socket.io.min.js"></script>
+</head>
+<body>
+    <h1>Real-Time Crowd Density Tracker</h1>
+    <div id="map"></div>
+    <div id="people_count">People Count: 0</div>
+
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <script>
+        // Initialize map
+        var map = L.map('map').setView([51.505, -0.09], 13);
+
+        // Add OpenStreetMap tile layer
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+        }).addTo(map);
+
+        // Initialize socket connection
+        var socket = io.connect('http://' + document.domain + ':' + location.port);
+
+        // Listen for population updates from server
+        socket.on('update_population', function(data) {
+            // Update people count on screen
+            document.getElementById('people_count').textContent = 'People Count: ' + data.length;
+
+            // Clear previous markers
+            map.eachLayer(function(layer) {
+                if (layer.options && layer.options.pane === "markerPane") {
+                    map.removeLayer(layer);
+                }
+            });
+
+            // Add new markers
+            data.forEach(function(coords) {
+                L.marker([coords[0], coords[1]]).addTo(map);
+            });
+        });
+        // Get user's current GPS location
+        navigator.geolocation.getCurrentPosition(function(position) {
+            var lat = position.coords.latitude;
+            var lon = position.coords.longitude;
+    
+            // Send the latitude and longitude to the server
+            fetch('/send_location', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ latitude: lat, longitude: lon }),
+            }).then(response => response.json())
+            .then(data => {
+                console.log('Location sent:', data);
+            }).catch(error => {
+                console.error('Error:', error);
+            });
+        });
+    </script>    
+</body>
+</html>
